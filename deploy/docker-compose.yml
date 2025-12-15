@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  omni-agent-server:
+    build:
+      context: ../..
+      dockerfile: Omni-Agent/deploy/Dockerfile
+    container_name: omni-agent-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../src:/app/src
+      - ../workspace:/app/workspace  # Mount workspace for file operations
+      # Mount Qwen-Agent for development (optional, if you want to edit Qwen-Agent and see changes)
+      - ../../Qwen-Agent:/app/Qwen-Agent
+    env_file:
+      - ../.env
+    restart: unless-stopped

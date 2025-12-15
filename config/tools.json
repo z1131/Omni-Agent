@@ -1,0 +1,20 @@
+{
+  "tools": {
+    "code_interpreter": {
+      "id": "code_interpreter",
+      "name": "代码解释器",
+      "description": "执行 Python 代码，支持数据分析、数学计算、图表绘制等功能",
+      "category": "开发工具",
+      "enabled": true,
+      "is_builtin": true
+    },
+    "file_reader": {
+      "id": "file_reader",
+      "name": "文件阅读器",
+      "description": "读取工作区内的文件内容，支持文本、代码等多种格式",
+      "category": "文件操作",
+      "enabled": true,
+      "is_builtin": true
+    }
+  }
+}

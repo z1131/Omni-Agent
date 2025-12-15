@@ -1,0 +1,6 @@
+qwen-agent[gui,code_interpreter]
+modelscope
+gradio
+fastapi
+uvicorn
+mcp

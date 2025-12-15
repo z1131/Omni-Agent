@@ -1,0 +1,31 @@
+{
+  "servers": [
+    {
+      "id": "mcp_fetch",
+      "name": "网页抓取",
+      "description": "抓取网页内容并转换为 Markdown 格式，便于 AI 理解和处理",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {},
+      "enabled": false
+    },
+    {
+      "id": "mcp_filesystem",
+      "name": "文件系统",
+      "description": "访问和操作本地文件系统，支持读写文件、目录浏览等",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": {},
+      "enabled": false
+    },
+    {
+      "id": "mcp_memory",
+      "name": "知识图谱记忆",
+      "description": "基于知识图谱的持久化记忆系统，帮助 AI 记住重要信息",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {},
+      "enabled": false
+    }
+  ]
+}
