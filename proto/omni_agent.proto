@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package omniagent;
+
+option java_package = "com.deepknow.omniagent.grpc";
+option java_outer_classname = "OmniAgentProto";
+option java_multiple_files = true;
+
+import "stt.proto";
+import "llm.proto";
+
+// Omni-Agent gRPC 服务
+// 提供 STT（语音转文字）和 LLM（大语言模型）能力
+service OmniAgentService {
+  // STT 双向流：客户端发送音频帧，服务端返回识别结果
+  rpc StreamSTT(stream SttRequest) returns (stream SttResponse);
+  
+  // LLM 流式调用：客户端发送问题，服务端流式返回答案
+  rpc StreamChat(ChatRequest) returns (stream ChatResponse);
+  
+  // 健康检查
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  map<string, string> metadata = 3;
+}

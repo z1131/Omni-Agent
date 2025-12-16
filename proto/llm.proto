@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package omniagent;
+
+option java_package = "com.deepknow.omniagent.grpc";
+option java_multiple_files = true;
+
+// LLM 请求
+message ChatRequest {
+  string session_id = 1;              // 会话ID（可选）
+  string provider = 2;                // LLM 提供商: qwen, openai, azure
+  string model = 3;                   // 模型: qwen-turbo, qwen-plus, gpt-4
+  repeated ChatMessage messages = 4;  // 对话历史
+  float temperature = 5;              // 温度 0.0-2.0
+  int32 max_tokens = 6;               // 最大生成 token 数
+  float top_p = 7;                    // Top-P 采样
+  string system_prompt = 8;           // 系统提示词（可选，覆盖 messages 中的 system）
+  map<string, string> extra = 9;      // 额外参数
+}
+
+// 对话消息
+message ChatMessage {
+  string role = 1;                    // system, user, assistant
+  string content = 2;                 // 消息内容
+}
+
+// LLM 响应（流式）
+message ChatResponse {
+  oneof response_type {
+    ChatDelta delta = 1;              // 增量内容
+    ChatComplete complete = 2;        // 完成
+    ChatError error = 3;              // 错误
+  }
+}
+
+// 增量内容
+message ChatDelta {
+  string content = 1;                 // 增量文本
+  int32 index = 2;                    // 序号
+}
+
+// 完成
+message ChatComplete {
+  string finish_reason = 1;           // stop, length, content_filter
+  int32 prompt_tokens = 2;            // 输入 token 数
+  int32 completion_tokens = 3;        // 输出 token 数
+  int32 total_tokens = 4;             // 总 token 数
+}
+
+// 错误
+message ChatError {
+  int32 code = 1;                     // 错误码
+  string message = 2;                 // 错误描述
+}

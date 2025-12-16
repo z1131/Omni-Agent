@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package omniagent;
+
+option java_package = "com.deepknow.omniagent.grpc";
+option java_multiple_files = true;
+
+// STT 请求（客户端 → 服务端）
+message SttRequest {
+  oneof request_type {
+    SttConfig config = 1;      // 首次请求：配置信息
+    AudioFrame audio = 2;      // 后续请求：音频帧
+    SttControl control = 3;    // 控制命令
+  }
+}
+
+// STT 配置
+message SttConfig {
+  string session_id = 1;       // 会话ID（可选，服务端可自动生成）
+  string provider = 2;         // STT 提供商: aliyun, azure, google
+  string model = 3;            // 模型名称: paraformer-realtime-v2
+  string language = 4;         // 语言: zh-CN, en-US
+  int32 sample_rate = 5;       // 采样率: 16000
+  bool enable_punctuation = 6; // 是否启用标点
+  map<string, string> extra = 7; // 额外参数
+}
+
+// 音频帧
+message AudioFrame {
+  bytes data = 1;              // PCM 音频数据 (16-bit, mono)
+  int64 timestamp_ms = 2;      // 时间戳（可选）
+  int32 sequence = 3;          // 序列号（可选，用于乱序检测）
+}
+
+// 控制命令
+message SttControl {
+  enum Command {
+    UNKNOWN = 0;
+    END = 1;                   // 结束音频流
+    PAUSE = 2;                 // 暂停识别
+    RESUME = 3;                // 恢复识别
+  }
+  Command command = 1;
+}
+
+// STT 响应（服务端 → 客户端）
+message SttResponse {
+  oneof response_type {
+    SttReady ready = 1;        // STT 准备就绪
+    SttResult result = 2;      // 识别结果
+    SttError error = 3;        // 错误信息
+    SttComplete complete = 4;  // 识别完成
+  }
+}
+
+// STT 准备就绪
+message SttReady {
+  string session_id = 1;       // 服务端分配的会话ID
+  string message = 2;
+}
+
+// 识别结果
+message SttResult {
+  string text = 1;             // 识别文本
+  bool is_final = 2;           // 是否为最终结果（false=中间结果）
+  float confidence = 3;        // 置信度 0.0-1.0
+  int64 start_time_ms = 4;     // 语音开始时间
+  int64 end_time_ms = 5;       // 语音结束时间
+}
+
+// 错误信息
+message SttError {
+  int32 code = 1;              // 错误码
+  string message = 2;          // 错误描述
+}
+
+// 识别完成
+message SttComplete {
+  string session_id = 1;
+  string message = 2;
+  int32 total_audio_ms = 3;    // 总音频时长（毫秒）
+}
