@@ -26,7 +26,9 @@ COPY src/ ./src/
 COPY sdk/ ./sdk/
 
 # 暴露端口
-EXPOSE 8000
+# 8000: HTTP API (FastAPI)
+# 50051: gRPC API (业务服务调用)
+EXPOSE 8000 50051
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

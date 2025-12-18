@@ -24,9 +24,10 @@ _sym_db = _symbol_database.Default()
 
 from . import stt_pb2 as stt__pb2
 from . import llm_pb2 as llm__pb2
+from . import multimodal_pb2 as multimodal__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10omni_agent.proto\x12\tomniagent\x1a\tstt.proto\x1a\tllm.proto\"\x0f\n\rHealthRequest\"\x9e\x01\n\x0eHealthResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x39\n\x08metadata\x18\x03 \x03(\x0b\x32\'.omniagent.HealthResponse.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x32\xd7\x01\n\x10OmniAgentService\x12>\n\tStreamSTT\x12\x15.omniagent.SttRequest\x1a\x16.omniagent.SttResponse(\x01\x30\x01\x12?\n\nStreamChat\x12\x16.omniagent.ChatRequest\x1a\x17.omniagent.ChatResponse0\x01\x12\x42\n\x0bHealthCheck\x12\x18.omniagent.HealthRequest\x1a\x19.omniagent.HealthResponseB/\n\x1b\x63om.deepknow.omniagent.grpcB\x0eOmniAgentProtoP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10omni_agent.proto\x12\tomniagent\x1a\tstt.proto\x1a\tllm.proto\x1a\x10multimodal.proto\"\x0f\n\rHealthRequest\"\x9e\x01\n\x0eHealthResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x39\n\x08metadata\x18\x03 \x03(\x0b\x32\'.omniagent.HealthResponse.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x32\xfd\x02\n\x10OmniAgentService\x12\x46\n\x07Process\x12\x1c.omniagent.MultiModalRequest\x1a\x1d.omniagent.MultiModalResponse\x12\\\n\rProcessStream\x12\".omniagent.MultiModalStreamRequest\x1a#.omniagent.MultiModalStreamResponse(\x01\x30\x01\x12>\n\tStreamSTT\x12\x15.omniagent.SttRequest\x1a\x16.omniagent.SttResponse(\x01\x30\x01\x12?\n\nStreamChat\x12\x16.omniagent.ChatRequest\x1a\x17.omniagent.ChatResponse0\x01\x12\x42\n\x0bHealthCheck\x12\x18.omniagent.HealthRequest\x1a\x19.omniagent.HealthResponseB/\n\x1b\x63om.deepknow.omniagent.grpcB\x0eOmniAgentProtoP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,12 +37,12 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'\n\033com.deepknow.omniagent.grpcB\016OmniAgentProtoP\001'
   _globals['_HEALTHRESPONSE_METADATAENTRY']._loaded_options = None
   _globals['_HEALTHRESPONSE_METADATAENTRY']._serialized_options = b'8\001'
-  _globals['_HEALTHREQUEST']._serialized_start=53
-  _globals['_HEALTHREQUEST']._serialized_end=68
-  _globals['_HEALTHRESPONSE']._serialized_start=71
-  _globals['_HEALTHRESPONSE']._serialized_end=229
-  _globals['_HEALTHRESPONSE_METADATAENTRY']._serialized_start=182
-  _globals['_HEALTHRESPONSE_METADATAENTRY']._serialized_end=229
-  _globals['_OMNIAGENTSERVICE']._serialized_start=232
-  _globals['_OMNIAGENTSERVICE']._serialized_end=447
+  _globals['_HEALTHREQUEST']._serialized_start=71
+  _globals['_HEALTHREQUEST']._serialized_end=86
+  _globals['_HEALTHRESPONSE']._serialized_start=89
+  _globals['_HEALTHRESPONSE']._serialized_end=247
+  _globals['_HEALTHRESPONSE_METADATAENTRY']._serialized_start=200
+  _globals['_HEALTHRESPONSE_METADATAENTRY']._serialized_end=247
+  _globals['_OMNIAGENTSERVICE']._serialized_start=250
+  _globals['_OMNIAGENTSERVICE']._serialized_end=631
 # @@protoc_insertion_point(module_scope)

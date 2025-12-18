@@ -1,0 +1,30 @@
+services:
+  omni-agent:
+    image: crpi-16uyo5eg9cykcl2r.cn-hangzhou.personal.cr.aliyuncs.com/deepknow/omni-agent:latest
+    container_name: omni-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"    # HTTP API (FastAPI)
+      - "50051:50051"  # gRPC API (业务服务调用)
+    env_file:
+      - /root/omni-agent/.env
+    environment:
+      TZ: Asia/Shanghai
+      # HTTP 服务配置
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      # gRPC 服务配置
+      GRPC_ENABLED: "true"
+      GRPC_PORT: "50051"
+      # 日志配置
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      LOG_FORMAT: "${LOG_FORMAT:-text}"
+      # LLM 配置
+      DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY}"
+      DEFAULT_LLM_MODEL: "${DEFAULT_LLM_MODEL:-qwen-max}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

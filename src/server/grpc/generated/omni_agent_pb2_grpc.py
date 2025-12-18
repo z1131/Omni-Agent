@@ -4,6 +4,7 @@ import grpc
 import warnings
 
 from . import llm_pb2 as llm__pb2
+from . import multimodal_pb2 as multimodal__pb2
 from . import omni_agent_pb2 as omni__agent__pb2
 from . import stt_pb2 as stt__pb2
 
@@ -29,7 +30,8 @@ if _version_not_supported:
 
 class OmniAgentServiceStub(object):
     """Omni-Agent gRPC 服务
-    提供 STT（语音转文字）和 LLM（大语言模型）能力
+    提供统一多模态 AI 能力
+    ========== 统一多模态接口（推荐）==========
     """
 
     def __init__(self, channel):
@@ -38,6 +40,16 @@ class OmniAgentServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Process = channel.unary_unary(
+                '/omniagent.OmniAgentService/Process',
+                request_serializer=multimodal__pb2.MultiModalRequest.SerializeToString,
+                response_deserializer=multimodal__pb2.MultiModalResponse.FromString,
+                _registered_method=True)
+        self.ProcessStream = channel.stream_stream(
+                '/omniagent.OmniAgentService/ProcessStream',
+                request_serializer=multimodal__pb2.MultiModalStreamRequest.SerializeToString,
+                response_deserializer=multimodal__pb2.MultiModalStreamResponse.FromString,
+                _registered_method=True)
         self.StreamSTT = channel.stream_stream(
                 '/omniagent.OmniAgentService/StreamSTT',
                 request_serializer=stt__pb2.SttRequest.SerializeToString,
@@ -57,11 +69,28 @@ class OmniAgentServiceStub(object):
 
 class OmniAgentServiceServicer(object):
     """Omni-Agent gRPC 服务
-    提供 STT（语音转文字）和 LLM（大语言模型）能力
+    提供统一多模态 AI 能力
+    ========== 统一多模态接口（推荐）==========
     """
 
+    def Process(self, request, context):
+        """非流式多模态处理：支持 text + audio + image 组合输入
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ProcessStream(self, request_iterator, context):
+        """流式多模态处理：支持实时音频输入 + 流式输出
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def StreamSTT(self, request_iterator, context):
-        """STT 双向流：客户端发送音频帧，服务端返回识别结果
+        """========== 细粒度接口（保留）==========
+
+        STT 双向流：客户端发送音频帧，服务端返回识别结果
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -84,6 +113,16 @@ class OmniAgentServiceServicer(object):
 
 def add_OmniAgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Process': grpc.unary_unary_rpc_method_handler(
+                    servicer.Process,
+                    request_deserializer=multimodal__pb2.MultiModalRequest.FromString,
+                    response_serializer=multimodal__pb2.MultiModalResponse.SerializeToString,
+            ),
+            'ProcessStream': grpc.stream_stream_rpc_method_handler(
+                    servicer.ProcessStream,
+                    request_deserializer=multimodal__pb2.MultiModalStreamRequest.FromString,
+                    response_serializer=multimodal__pb2.MultiModalStreamResponse.SerializeToString,
+            ),
             'StreamSTT': grpc.stream_stream_rpc_method_handler(
                     servicer.StreamSTT,
                     request_deserializer=stt__pb2.SttRequest.FromString,
@@ -109,8 +148,63 @@ def add_OmniAgentServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class OmniAgentService(object):
     """Omni-Agent gRPC 服务
-    提供 STT（语音转文字）和 LLM（大语言模型）能力
+    提供统一多模态 AI 能力
+    ========== 统一多模态接口（推荐）==========
     """
+
+    @staticmethod
+    def Process(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/omniagent.OmniAgentService/Process',
+            multimodal__pb2.MultiModalRequest.SerializeToString,
+            multimodal__pb2.MultiModalResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ProcessStream(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/omniagent.OmniAgentService/ProcessStream',
+            multimodal__pb2.MultiModalStreamRequest.SerializeToString,
+            multimodal__pb2.MultiModalStreamResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def StreamSTT(request_iterator,

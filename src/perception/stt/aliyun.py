@@ -218,6 +218,88 @@ class AliyunSttService(SttService):
         except Exception as e:
             logger.error("Keepalive loop error", exc=e)
     
+    async def transcribe_once(self, audio_data: bytes, config: SttConfig) -> str:
+        """单次语音识别（非流式）
+        
+        Args:
+            audio_data: 完整音频数据
+            config: STT 配置
+            
+        Returns:
+            识别出的文本
+        """
+        import dashscope
+        from dashscope.audio.asr import Recognition
+        
+        dashscope.api_key = self.api_key
+        
+        results = []
+        completed = asyncio.Event()
+        error_msg = None
+        
+        class OnceCallback:
+            def on_open(self):
+                pass
+            
+            def on_close(self):
+                pass
+            
+            def on_event(self, result):
+                sentence = result.get_sentence()
+                if sentence:
+                    text = sentence.get('text', '')
+                    end_time = sentence.get('end_time')
+                    is_final = end_time is not None and end_time > 0
+                    if is_final and text:
+                        results.append(text)
+            
+            def on_error(self, result):
+                nonlocal error_msg
+                error_msg = str(result)
+                completed.set()
+            
+            def on_complete(self):
+                completed.set()
+        
+        try:
+            recognition = Recognition(
+                model=config.model or 'paraformer-realtime-v2',
+                format='pcm',
+                sample_rate=config.sample_rate or 16000,
+                callback=OnceCallback()
+            )
+            
+            recognition.start()
+            
+            # 分块发送音频（避免单次发送过大）
+            chunk_size = 3200  # 100ms at 16kHz
+            for i in range(0, len(audio_data), chunk_size):
+                chunk = audio_data[i:i+chunk_size]
+                recognition.send_audio_frame(chunk)
+                await asyncio.sleep(0.01)  # 小延迟避免过快发送
+            
+            recognition.stop()
+            
+            # 等待完成
+            try:
+                await asyncio.wait_for(completed.wait(), timeout=10.0)
+            except asyncio.TimeoutError:
+                logger.warn("Transcribe once timeout")
+            
+            if error_msg:
+                raise Exception(f"STT error: {error_msg}")
+            
+            return " ".join(results)
+            
+        except Exception as e:
+            logger.error("Transcribe once failed", exc=e)
+            raise
+    
+    async def flush(self) -> None:
+        """刷新当前音频缓冲"""
+        # Aliyun SDK 不支持显式 flush，静默忽略
+        pass
+    
     async def stop_session(self) -> None:
         """结束 STT 会话"""
         # 先取消保活任务

@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package omniagent;
+
+option java_package = "com.deepknow.omniagent.grpc";
+option java_multiple_files = true;
+
+// ========== 统一多模态接口 ==========
+
+// 多模态请求
+message MultiModalRequest {
+  string session_id = 1;                    // 会话ID
+  repeated ModalityInput inputs = 2;        // 多模态输入（可组合）
+  ProcessingConfig config = 3;              // 处理配置
+}
+
+// 模态输入
+message ModalityInput {
+  oneof content {
+    TextInput text = 1;                     // 文本输入
+    AudioInput audio = 2;                   // 音频输入
+    ImageInput image = 3;                   // 图片输入（预留）
+  }
+}
+
+// 文本输入
+message TextInput {
+  string content = 1;                       // 文本内容
+  string role = 2;                          // 角色: user, system（默认 user）
+}
+
+// 音频输入
+message AudioInput {
+  bytes data = 1;                           // 音频数据
+  string format = 2;                        // 格式: pcm, wav, mp3（默认 pcm）
+  int32 sample_rate = 3;                    // 采样率（默认 16000）
+  int32 channels = 4;                       // 声道数（默认 1）
+  int32 bits_per_sample = 5;                // 位深（默认 16）
+}
+
+// 图片输入（预留）
+message ImageInput {
+  bytes data = 1;                           // 图片数据
+  string format = 2;                        // 格式: jpeg, png
+  string prompt = 3;                        // 针对图片的问题（可选）
+}
+
+// 处理配置
+message ProcessingConfig {
+  // STT 配置
+  string stt_provider = 1;                  // STT 提供商: aliyun, azure
+  string stt_model = 2;                     // STT 模型
+  string language = 3;                      // 语言: zh-CN, en-US
+  
+  // LLM 配置
+  string llm_provider = 4;                  // LLM 提供商: qwen, openai
+  string llm_model = 5;                     // LLM 模型: qwen-turbo, gpt-4
+  float temperature = 6;                    // 温度
+  int32 max_tokens = 7;                     // 最大 token
+  string system_prompt = 8;                 // 系统提示词
+  
+  // 输出配置
+  bool enable_tts = 9;                      // 是否返回语音（预留）
+  string tts_provider = 10;                 // TTS 提供商（预留）
+  string tts_voice = 11;                    // TTS 音色（预留）
+}
+
+// 多模态响应（非流式）
+message MultiModalResponse {
+  string session_id = 1;                    // 会话ID
+  repeated ModalityOutput outputs = 2;      // 多模态输出
+  ProcessingMetadata metadata = 3;          // 处理元数据
+}
+
+// 模态输出
+message ModalityOutput {
+  oneof content {
+    TextOutput text = 1;                    // 文本输出
+    AudioOutput audio = 2;                  // 音频输出（TTS，预留）
+  }
+}
+
+// 文本输出
+message TextOutput {
+  string content = 1;                       // 文本内容
+  string role = 2;                          // 角色: assistant
+}
+
+// 音频输出（预留）
+message AudioOutput {
+  bytes data = 1;                           // 音频数据
+  string format = 2;                        // 格式
+  int32 sample_rate = 3;                    // 采样率
+}
+
+// 处理元数据
+message ProcessingMetadata {
+  string finish_reason = 1;                 // 完成原因: stop, length, error
+  int32 prompt_tokens = 2;                  // 输入 token
+  int32 completion_tokens = 3;              // 输出 token
+  int32 audio_duration_ms = 4;              // 音频时长（如有）
+  string transcribed_text = 5;              // STT 转写结果（如有音频输入）
+  int64 latency_ms = 6;                     // 处理耗时
+}
+
+// ========== 流式多模态接口 ==========
+
+// 流式请求帧
+message MultiModalStreamRequest {
+  oneof frame {
+    StreamStartFrame start = 1;             // 开始帧（首帧）
+    StreamAudioFrame audio = 2;             // 音频帧（后续）
+    StreamControlFrame control = 3;         // 控制帧
+  }
+}
+
+// 开始帧
+message StreamStartFrame {
+  string session_id = 1;                    // 会话ID
+  ProcessingConfig config = 2;              // 处理配置
+  repeated ModalityInput initial_inputs = 3;// 初始输入（text/image，非流式部分）
+}
+
+// 音频帧
+message StreamAudioFrame {
+  bytes data = 1;                           // 音频数据块
+  int64 timestamp_ms = 2;                   // 时间戳
+  int32 sequence = 3;                       // 序列号
+}
+
+// 控制帧
+message StreamControlFrame {
+  enum Command {
+    UNKNOWN = 0;
+    FLUSH = 1;                              // 刷新（立即处理当前音频）
+    END_AUDIO = 2;                          // 音频结束，开始生成回复
+    CANCEL = 3;                             // 取消当前处理
+  }
+  Command command = 1;
+}
+
+// 流式响应帧
+message MultiModalStreamResponse {
+  oneof frame {
+    StreamReadyFrame ready = 1;             // 准备就绪
+    StreamSttFrame stt = 2;                 // STT 中间结果
+    StreamLlmFrame llm = 3;                 // LLM 增量输出
+    StreamTtsFrame tts = 4;                 // TTS 音频块（预留）
+    StreamCompleteFrame complete = 5;       // 处理完成
+    StreamErrorFrame error = 6;             // 错误
+  }
+}
+
+// 准备就绪帧
+message StreamReadyFrame {
+  string session_id = 1;
+  string message = 2;
+}
+
+// STT 中间结果帧
+message StreamSttFrame {
+  string text = 1;                          // 识别文本
+  bool is_final = 2;                        // 是否为最终结果
+  float confidence = 3;                     // 置信度
+}
+
+// LLM 增量输出帧
+message StreamLlmFrame {
+  string delta = 1;                         // 增量文本
+  int32 index = 2;                          // 序号
+}
+
+// TTS 音频帧（预留）
+message StreamTtsFrame {
+  bytes data = 1;                           // 音频数据块
+  int32 sequence = 2;                       // 序列号
+}
+
+// 完成帧
+message StreamCompleteFrame {
+  string finish_reason = 1;                 // 完成原因
+  ProcessingMetadata metadata = 2;          // 处理元数据
+}
+
+// 错误帧
+message StreamErrorFrame {
+  int32 code = 1;                           // 错误码
+  string message = 2;                       // 错误描述
+  bool recoverable = 3;                     // 是否可恢复
+}
