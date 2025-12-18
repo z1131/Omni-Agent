@@ -23,7 +23,6 @@ RUN pip install --no-cache-dir \
 
 # 复制源代码
 COPY src/ ./src/
-COPY sdk/ ./sdk/
 
 # 暴露端口
 # 8000: HTTP API (FastAPI)
