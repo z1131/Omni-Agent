@@ -21,7 +21,16 @@ RUN pip install --no-cache-dir \
     python-multipart \
     pydantic-settings
 
-# 复制源代码
+# 复制 proto 文件并重新生成 gRPC 代码（确保与 protobuf 运行时版本匹配）
+COPY proto/ ./proto/
+RUN mkdir -p src/server/grpc/generated && \
+    python -m grpc_tools.protoc \
+    -I proto \
+    --python_out=src/server/grpc/generated \
+    --grpc_python_out=src/server/grpc/generated \
+    proto/*.proto
+
+# 复制源代码（覆盖生成的文件外的其他代码）
 COPY src/ ./src/
 
 # 暴露端口
