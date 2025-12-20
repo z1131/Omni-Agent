@@ -146,7 +146,7 @@ async def lifespan(app: FastAPI):
     # 重新初始化日志（可能从 Nacos 读取了新配置）
     log_level, log_format, sls_config = _init_config_from_nacos_or_env()
     setup_logging(level=log_level, format=log_format, sls_config=sls_config)
-    logger.info("Logging reconfigured", level=log_level, format=log_format, sls_enabled=sls_config is not None)
+    logger.info("Logging reconfigured", log_level_value=log_level, log_format_value=log_format, sls_enabled=sls_config is not None)
     
     # 启动会话管理器
     session_manager = get_session_manager()
