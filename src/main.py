@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
     
     # 获取 Nacos 连接信息（这些必须从环境变量获取，因为 Nacos 还未初始化）
     nacos_config_enabled = os.getenv('NACOS_CONFIG_ENABLED', 'true').lower() == 'true'
-    nacos_server = os.getenv('NACOS_SERVER_ADDR', '47.114.90.156:8848')
+    nacos_server = os.getenv('NACOS_SERVER_ADDR', '172.17.150.78:8848')
     nacos_namespace = os.getenv('NACOS_NAMESPACE', 'public')
     nacos_username = os.getenv('NACOS_USERNAME', 'nacos')
     nacos_password = os.getenv('NACOS_PASSWORD', 'nacos')

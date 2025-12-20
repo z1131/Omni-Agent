@@ -19,7 +19,7 @@ services:
       LOG_FORMAT: "json"
       # Nacos 服务注册配置
       NACOS_ENABLED: "true"
-      NACOS_SERVER_ADDR: "47.114.90.156:8848"
+      NACOS_SERVER_ADDR: "172.17.150.78:8848"
       NACOS_NAMESPACE: "public"
       NACOS_USERNAME: "nacos"
       NACOS_PASSWORD: "nacos"
