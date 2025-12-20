@@ -28,6 +28,12 @@ from .hooks import (
     LoggingHooks,
 )
 
+from .nacos import (
+    NacosRegistry,
+    init_nacos_registry,
+    get_nacos_registry,
+)
+
 __all__ = [
     # Logging
     'get_logger',
@@ -47,4 +53,8 @@ __all__ = [
     'AgentHooks',
     'CompositeHooks',
     'LoggingHooks',
+    # Nacos
+    'NacosRegistry',
+    'init_nacos_registry',
+    'get_nacos_registry',
 ]

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from .server.http.routes import v1_router
 from .orchestrator import get_session_manager
-from .infra import get_logger, setup_logging, log_context, generate_trace_id
+from .infra import get_logger, setup_logging, log_context, generate_trace_id, init_nacos_registry, get_nacos_registry
 
 # 初始化日志
 log_level = os.getenv('LOG_LEVEL', 'INFO')
@@ -49,12 +49,38 @@ async def lifespan(app: FastAPI):
     
     # 启动 gRPC 服务器（如果启用）
     grpc_server = None
+    grpc_port = int(os.getenv('GRPC_PORT', '50051'))
     grpc_enabled = os.getenv('GRPC_ENABLED', 'true').lower() == 'true'
     if grpc_enabled:
         from .server.grpc import GrpcServer
-        grpc_port = int(os.getenv('GRPC_PORT', '50051'))
         grpc_server = GrpcServer(port=grpc_port)
         await grpc_server.start()
+    
+    # 注册到 Nacos（如果启用）
+    nacos_registry = None
+    nacos_enabled = os.getenv('NACOS_ENABLED', 'false').lower() == 'true'
+    if nacos_enabled:
+        nacos_server = os.getenv('NACOS_SERVER_ADDR', 'localhost:8848')
+        nacos_namespace = os.getenv('NACOS_NAMESPACE', 'public')
+        nacos_username = os.getenv('NACOS_USERNAME')
+        nacos_password = os.getenv('NACOS_PASSWORD')
+        nacos_service_name = os.getenv('NACOS_SERVICE_NAME', 'omni-agent')
+        nacos_group = os.getenv('NACOS_GROUP', 'DEFAULT_GROUP')
+        
+        nacos_registry = init_nacos_registry(
+            server_addr=nacos_server,
+            namespace=nacos_namespace,
+            username=nacos_username,
+            password=nacos_password,
+            service_name=nacos_service_name,
+            service_port=grpc_port,
+            group_name=nacos_group,
+            metadata={
+                'protocol': 'grpc',
+                'version': '0.1.0'
+            }
+        )
+        nacos_registry.register()
     
     logger.info("Omni-Agent started successfully")
     
@@ -62,6 +88,11 @@ async def lifespan(app: FastAPI):
     
     # 关闭时
     logger.info("Omni-Agent shutting down...")
+    
+    # 从 Nacos 注销
+    if nacos_registry:
+        nacos_registry.deregister()
+    
     if grpc_server:
         await grpc_server.stop()
     await session_manager.stop()

@@ -29,6 +29,15 @@ services:
       # LLM 配置
       DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY}"
       DEFAULT_LLM_MODEL: "${DEFAULT_LLM_MODEL:-qwen-max}"
+      # Nacos 服务注册配置
+      NACOS_ENABLED: "${NACOS_ENABLED:-false}"
+      NACOS_SERVER_ADDR: "${NACOS_SERVER_ADDR:-localhost:8848}"
+      NACOS_NAMESPACE: "${NACOS_NAMESPACE:-public}"
+      NACOS_USERNAME: "${NACOS_USERNAME:-nacos}"
+      NACOS_PASSWORD: "${NACOS_PASSWORD:-nacos}"
+      NACOS_SERVICE_NAME: "${NACOS_SERVICE_NAME:-omni-agent}"
+      NACOS_GROUP: "${NACOS_GROUP:-DEFAULT_GROUP}"
+      SERVICE_IP: "${SERVICE_IP}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s

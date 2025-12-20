@@ -8,3 +8,4 @@ grpcio>=1.59.0
 grpcio-tools>=1.59.0
 protobuf>=4.24.0
 aliyun-log-python-sdk>=0.8.0
+nacos-sdk-python>=1.0.0
