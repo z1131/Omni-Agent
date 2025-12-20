@@ -17,7 +17,22 @@ from .infra import get_logger, setup_logging, log_context, generate_trace_id
 # 初始化日志
 log_level = os.getenv('LOG_LEVEL', 'INFO')
 log_format = os.getenv('LOG_FORMAT', 'text')
-setup_logging(level=log_level, format=log_format)
+
+# SLS 配置（从环境变量读取）
+sls_config = None
+if os.getenv('SLS_ENABLED', 'false').lower() == 'true':
+    sls_config = {
+        'enabled': True,
+        'endpoint': os.getenv('SLS_ENDPOINT', 'cn-hangzhou.log.aliyuncs.com'),
+        'project': os.getenv('SLS_PROJECT'),
+        'logstore': os.getenv('SLS_LOGSTORE', 'omni-agent'),
+        'access_key_id': os.getenv('SLS_ACCESS_KEY_ID'),
+        'access_key_secret': os.getenv('SLS_ACCESS_KEY_SECRET'),
+        'batch_size': int(os.getenv('SLS_BATCH_SIZE', '100')),
+        'flush_interval_ms': int(os.getenv('SLS_FLUSH_INTERVAL_MS', '3000')),
+    }
+
+setup_logging(level=log_level, format=log_format, sls_config=sls_config)
 
 logger = get_logger(__name__)
 

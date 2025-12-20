@@ -18,7 +18,14 @@ services:
       GRPC_PORT: "50051"
       # 日志配置
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      LOG_FORMAT: "${LOG_FORMAT:-text}"
+      LOG_FORMAT: "${LOG_FORMAT:-json}"
+      # SLS 日志配置
+      SLS_ENABLED: "${SLS_ENABLED:-false}"
+      SLS_ENDPOINT: "${SLS_ENDPOINT:-cn-hangzhou.log.aliyuncs.com}"
+      SLS_PROJECT: "${SLS_PROJECT}"
+      SLS_LOGSTORE: "${SLS_LOGSTORE:-omni-agent}"
+      SLS_ACCESS_KEY_ID: "${SLS_ACCESS_KEY_ID}"
+      SLS_ACCESS_KEY_SECRET: "${SLS_ACCESS_KEY_SECRET}"
       # LLM 配置
       DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY}"
       DEFAULT_LLM_MODEL: "${DEFAULT_LLM_MODEL:-qwen-max}"
