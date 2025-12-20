@@ -6,8 +6,6 @@ services:
     ports:
       - "8000:8000"    # HTTP API (FastAPI)
       - "50051:50051"  # gRPC API (业务服务调用)
-    env_file:
-      - /root/omni-agent/.env
     environment:
       TZ: Asia/Shanghai
       # HTTP 服务配置
@@ -16,27 +14,17 @@ services:
       # gRPC 服务配置
       GRPC_ENABLED: "true"
       GRPC_PORT: "50051"
-      # 日志配置
-      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      LOG_FORMAT: "${LOG_FORMAT:-json}"
-      # SLS 日志配置
-      SLS_ENABLED: "${SLS_ENABLED:-false}"
-      SLS_ENDPOINT: "${SLS_ENDPOINT:-cn-hangzhou.log.aliyuncs.com}"
-      SLS_PROJECT: "${SLS_PROJECT}"
-      SLS_LOGSTORE: "${SLS_LOGSTORE:-omni-agent}"
-      SLS_ACCESS_KEY_ID: "${SLS_ACCESS_KEY_ID}"
-      SLS_ACCESS_KEY_SECRET: "${SLS_ACCESS_KEY_SECRET}"
-      # LLM 配置
-      DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY}"
-      DEFAULT_LLM_MODEL: "${DEFAULT_LLM_MODEL:-qwen-max}"
+      # 日志配置（可从 Nacos 覆盖）
+      LOG_LEVEL: "INFO"
+      LOG_FORMAT: "json"
       # Nacos 服务注册配置
-      NACOS_ENABLED: "${NACOS_ENABLED:-false}"
-      NACOS_SERVER_ADDR: "${NACOS_SERVER_ADDR:-localhost:8848}"
-      NACOS_NAMESPACE: "${NACOS_NAMESPACE:-public}"
-      NACOS_USERNAME: "${NACOS_USERNAME:-nacos}"
-      NACOS_PASSWORD: "${NACOS_PASSWORD:-nacos}"
-      NACOS_SERVICE_NAME: "${NACOS_SERVICE_NAME:-omni-agent}"
-      NACOS_GROUP: "${NACOS_GROUP:-DEFAULT_GROUP}"
+      NACOS_ENABLED: "true"
+      NACOS_SERVER_ADDR: "47.114.90.156:8848"
+      NACOS_NAMESPACE: "public"
+      NACOS_USERNAME: "nacos"
+      NACOS_PASSWORD: "nacos"
+      NACOS_SERVICE_NAME: "omni-agent"
+      NACOS_GROUP: "DEEPKNOW_GROUP"
       SERVICE_IP: "${SERVICE_IP}"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

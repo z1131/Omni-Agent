@@ -34,6 +34,13 @@ from .nacos import (
     get_nacos_registry,
 )
 
+from .nacos_config import (
+    NacosConfig,
+    init_nacos_config,
+    get_nacos_config,
+    get_config_value,
+)
+
 __all__ = [
     # Logging
     'get_logger',
@@ -53,8 +60,14 @@ __all__ = [
     'AgentHooks',
     'CompositeHooks',
     'LoggingHooks',
-    # Nacos
+    # Nacos Registry
     'NacosRegistry',
     'init_nacos_registry',
     'get_nacos_registry',
+    # Nacos Config
+    'NacosConfig',
+    'init_nacos_config',
+    'get_nacos_config',
+    'get_config_value',
 ]
+
