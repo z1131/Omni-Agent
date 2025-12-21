@@ -24,13 +24,21 @@ RUN pip install --no-cache-dir \
 # 复制源代码（包含旧的 generated 文件）
 COPY src/ ./src/
 
-# 复制 proto 文件并重新生成 gRPC 代码（覆盖源码中的旧文件，确保与运行时 protobuf 版本匹配）
+# 复制 proto 文件并重新生成 gRPC 代码
 COPY proto/ ./proto/
 RUN python -m grpc_tools.protoc \
     -I proto \
     --python_out=src/server/grpc/generated \
     --grpc_python_out=src/server/grpc/generated \
     proto/*.proto
+
+# 修复生成代码中的导入语句：将绝对导入改为相对导入
+# 例如：import stt_pb2 -> from . import stt_pb2
+RUN cd src/server/grpc/generated && \
+    for f in *.py; do \
+        sed -i 's/^import \([a-z_]*_pb2\)/from . import \1/g' "$f"; \
+        sed -i 's/^import \([a-z_]*_pb2_grpc\)/from . import \1/g' "$f"; \
+    done
 
 # 暴露端口
 # 8000: HTTP API (FastAPI)
