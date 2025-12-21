@@ -79,6 +79,7 @@ class NacosRegistry:
     def register(self) -> bool:
         """注册服务到 Nacos"""
         try:
+            # 使用 SDK 原生心跳功能：heartbeat_interval 参数会自动启动后台心跳线程
             self.client.add_naming_instance(
                 service_name=self.service_name,
                 ip=self.service_ip,
@@ -88,11 +89,13 @@ class NacosRegistry:
                 metadata=self.metadata,
                 enable=True,
                 healthy=True,
+                ephemeral=True,  # 临时实例，需要心跳保持存活
+                heartbeat_interval=5,  # 每 5 秒自动发送心跳
                 group_name=self.group_name
             )
             self._registered = True
             logger.info(
-                "Service registered to Nacos",
+                "Service registered to Nacos with auto heartbeat",
                 service_name=self.service_name,
                 ip=self.service_ip,
                 port=self.service_port
