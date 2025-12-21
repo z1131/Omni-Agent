@@ -354,8 +354,8 @@ class OmniAgentServicer:
                 ],
                 metadata=multimodal_pb2.ProcessingMetadata(
                     finish_reason="stop",
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
+                    prompt_tokens=0,  # TODO: 从 LLM 响应中获取实际值
+                    completion_tokens=0,  # TODO: 从 LLM 响应中获取实际值
                     transcribed_text=transcribed_text,
                     latency_ms=latency_ms
                 )
@@ -562,8 +562,8 @@ class OmniAgentServicer:
                             complete=multimodal_pb2.StreamCompleteFrame(
                                 finish_reason="stop",
                                 metadata=multimodal_pb2.ProcessingMetadata(
-                                    prompt_tokens=prompt_tokens,
-                                    completion_tokens=completion_tokens,
+                                    prompt_tokens=0,  # TODO: 从 LLM 响应中获取实际值
+                                    completion_tokens=0,  # TODO: 从 LLM 响应中获取实际值
                                     transcribed_text=transcribed_text,
                                     latency_ms=int((time.time() - start_time) * 1000)
                                 )
