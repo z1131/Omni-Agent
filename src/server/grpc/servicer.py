@@ -6,9 +6,21 @@ import uuid
 from typing import AsyncIterator
 
 from ...infra import get_logger, generate_trace_id
+from ...reasoning.llm.base import Message, MessageRole, LlmConfig
 
 logger = get_logger(__name__)
 
+
+
+def _convert_messages(messages: list) -> list:
+    """将字典消息列表转换为 Message 对象列表"""
+    return [
+        Message(
+            role=MessageRole(msg["role"]) if msg["role"] in ["system", "user", "assistant"] else MessageRole.USER,
+            content=msg["content"]
+        )
+        for msg in messages
+    ]
 
 class OmniAgentServicer:
     """Omni-Agent gRPC 服务实现"""
@@ -195,31 +207,37 @@ class OmniAgentServicer:
             for msg in request.messages:
                 messages.append({"role": msg.role, "content": msg.content})
             
-            # 创建 LLM 服务
-            llm_service = QwenLlmService()
+            # 转换消息为 Message 对象
+            typed_messages = _convert_messages(messages)
             
-            index = 0
-            async for chunk in llm_service.stream_chat(
-                messages=messages,
+            # 构建 LLM 配置
+            llm_config = LlmConfig(
                 model=request.model or "qwen-turbo",
                 temperature=request.temperature or 0.7,
                 max_tokens=request.max_tokens or 2048,
-            ):
-                if chunk.get("type") == "delta":
+            )
+            
+            # 创建 LLM 服务并调用
+            llm_service = QwenLlmService()
+            index = 0
+            
+            async for chunk in llm_service.chat_stream(typed_messages, llm_config):
+                if chunk.delta:
                     yield llm_pb2.ChatResponse(
                         delta=llm_pb2.ChatDelta(
-                            content=chunk.get("content", ""),
+                            content=chunk.delta,
                             index=index
                         )
                     )
                     index += 1
-                elif chunk.get("type") == "complete":
+                
+                if chunk.finish_reason and chunk.finish_reason != "null":
                     yield llm_pb2.ChatResponse(
                         complete=llm_pb2.ChatComplete(
-                            finish_reason=chunk.get("finish_reason", "stop"),
-                            prompt_tokens=chunk.get("prompt_tokens", 0),
-                            completion_tokens=chunk.get("completion_tokens", 0),
-                            total_tokens=chunk.get("total_tokens", 0),
+                            finish_reason=chunk.finish_reason,
+                            prompt_tokens=0,
+                            completion_tokens=0,
+                            total_tokens=0,
                         )
                     )
         
@@ -306,23 +324,20 @@ class OmniAgentServicer:
                 )
             
             # 4. 调用 LLM
-            llm_service = QwenLlmService()
+            typed_messages = _convert_messages(messages)
             
-            full_response = ""
-            prompt_tokens = 0
-            completion_tokens = 0
-            
-            async for chunk in llm_service.stream_chat(
-                messages=messages,
+            llm_config = LlmConfig(
                 model=config.llm_model or "qwen-turbo",
                 temperature=config.temperature or 0.7,
                 max_tokens=config.max_tokens or 2048,
-            ):
-                if chunk.get("type") == "delta":
-                    full_response += chunk.get("content", "")
-                elif chunk.get("type") == "complete":
-                    prompt_tokens = chunk.get("prompt_tokens", 0)
-                    completion_tokens = chunk.get("completion_tokens", 0)
+            )
+            
+            llm_service = QwenLlmService()
+            full_response = ""
+            
+            async for chunk in llm_service.chat_stream(typed_messages, llm_config):
+                if chunk.delta:
+                    full_response += chunk.delta
             
             # 5. 构建响应
             latency_ms = int((time.time() - start_time) * 1000)
@@ -521,28 +536,26 @@ class OmniAgentServicer:
                             break
                         
                         # 调用 LLM 流式生成
-                        llm_service = QwenLlmService()
-                        index = 0
-                        prompt_tokens = 0
-                        completion_tokens = 0
+                        typed_messages = _convert_messages(messages)
                         
-                        async for chunk in llm_service.stream_chat(
-                            messages=messages,
+                        llm_config = LlmConfig(
                             model=config.llm_model or "qwen-turbo" if config else "qwen-turbo",
                             temperature=config.temperature or 0.7 if config else 0.7,
                             max_tokens=config.max_tokens or 2048 if config else 2048,
-                        ):
-                            if chunk.get("type") == "delta":
+                        )
+                        
+                        llm_service = QwenLlmService()
+                        index = 0
+                        
+                        async for chunk in llm_service.chat_stream(typed_messages, llm_config):
+                            if chunk.delta:
                                 yield multimodal_pb2.MultiModalStreamResponse(
                                     llm=multimodal_pb2.StreamLlmFrame(
-                                        delta=chunk.get("content", ""),
+                                        delta=chunk.delta,
                                         index=index
                                     )
                                 )
                                 index += 1
-                            elif chunk.get("type") == "complete":
-                                prompt_tokens = chunk.get("prompt_tokens", 0)
-                                completion_tokens = chunk.get("completion_tokens", 0)
                         
                         # 发送完成帧
                         yield multimodal_pb2.MultiModalStreamResponse(
