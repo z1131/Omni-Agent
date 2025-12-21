@@ -140,6 +140,12 @@ async def lifespan(app: FastAPI):
             nacos_config.get_config("omni-agent.yaml")
             
             logger.info("Nacos Config initialized successfully")
+            
+            # 从 Nacos 配置桥接 API Key 到环境变量（SDK 需要通过环境变量读取）
+            dashscope_key = _get_config("llm.dashscope-api-key")
+            if dashscope_key:
+                os.environ['DASHSCOPE_API_KEY'] = dashscope_key
+                logger.info("DASHSCOPE_API_KEY loaded from Nacos config")
         except Exception as e:
             logger.error("Failed to initialize Nacos Config, falling back to env vars", error=str(e))
     
