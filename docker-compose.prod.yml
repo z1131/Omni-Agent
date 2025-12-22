@@ -19,14 +19,14 @@ services:
       LOG_FORMAT: "json"
       # Nacos 服务注册配置
       NACOS_ENABLED: "true"
-      NACOS_SERVER_ADDR: "172.17.150.78:8848"
+      NACOS_SERVER_ADDR: "47.114.90.156:8848"
       NACOS_NAMESPACE: "public"
       NACOS_USERNAME: "nacos"
-      NACOS_PASSWORD: "Aa1231231212123"
+      NACOS_PASSWORD: "nacos"
       NACOS_SERVICE_NAME: "omni-agent"
       NACOS_GROUP: "DEEPKNOW_GROUP"
-      # 注册到 Nacos 时的 IP，强制使用宿主机内网 IP
-      SERVICE_IP: "172.17.150.78"
+      # 注册到 Nacos 时的 IP
+      SERVICE_IP: "47.114.90.156"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
