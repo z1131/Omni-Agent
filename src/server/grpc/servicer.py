@@ -378,8 +378,13 @@ class OmniAgentServicer:
         context
     ) -> AsyncIterator:
         """
-        流式多模态处理
-        支持实时音频输入 + 流式输出
+        流式多模态处理 - 实时对话辅助模式
+        
+        支持两种模式：
+        1. 自动触发模式：STT 识别到句子结束时自动触发 LLM 生成（适用于面试辅助等场景）
+        2. 手动触发模式：用户发送 END_AUDIO 后触发 LLM 生成（传统模式）
+        
+        默认使用自动触发模式。
         """
         from .generated import multimodal_pb2
         from ...perception.stt.aliyun import AliyunSttService
@@ -392,51 +397,94 @@ class OmniAgentServicer:
         config = None
         initial_inputs = []
         stt_service = None
-        transcribed_text = ""
-        stt_results = []
         audio_ended = False
         
+        # 用于通信的队列
         result_queue: asyncio.Queue = asyncio.Queue()
+        # 待处理的 STT 句子队列（用于自动触发 LLM）
+        pending_sentences: asyncio.Queue = asyncio.Queue()
+        # 当前正在进行的 LLM 生成任务
+        current_llm_task: asyncio.Task = None
+        # 对话历史（用于多轮对话）
+        conversation_history = []
+        # 回答计数
+        answer_index = 0
         
         def on_partial(result):
-            """STT 中间结果"""
-            result_queue.put_nowait(multimodal_pb2.MultiModalStreamResponse(
-                stt=multimodal_pb2.StreamSttFrame(
-                    text=result.text,
-                    is_final=False,
-                    confidence=result.confidence or 0.0
-                )
-            ))
+            """STT 中间结果 - 实时显示正在识别的内容"""
+            result_queue.put_nowait(("stt_partial", result.text, result.confidence or 0.0))
         
         def on_final(result):
-            """STT 最终结果"""
-            stt_results.append(result.text)
-            result_queue.put_nowait(multimodal_pb2.MultiModalStreamResponse(
-                stt=multimodal_pb2.StreamSttFrame(
-                    text=result.text,
-                    is_final=True,
-                    confidence=result.confidence or 0.0
-                )
-            ))
+            """STT 最终结果 - 句子识别完成，触发 LLM 生成"""
+            result_queue.put_nowait(("stt_final", result.text, result.confidence or 0.0))
+            # 将完整句子放入待处理队列
+            if result.text.strip():
+                pending_sentences.put_nowait(result.text.strip())
         
         def on_ready():
             """STT 准备就绪"""
-            result_queue.put_nowait(multimodal_pb2.MultiModalStreamResponse(
-                ready=multimodal_pb2.StreamReadyFrame(
-                    session_id=session_id,
-                    message="Ready for audio"
-                )
-            ))
+            result_queue.put_nowait(("ready", session_id, "Ready for audio"))
         
         def on_error(error):
             """STT 错误"""
-            result_queue.put_nowait(multimodal_pb2.MultiModalStreamResponse(
-                error=multimodal_pb2.StreamErrorFrame(
-                    code=5000,
-                    message=str(error),
-                    recoverable=False
+            result_queue.put_nowait(("error", str(error), None))
+        
+        async def generate_answer(sentence: str, ans_idx: int) -> AsyncIterator:
+            """为识别到的句子生成回答"""
+            nonlocal conversation_history
+            
+            logger.info(f"Auto-triggering LLM | session_id={session_id} sentence='{sentence[:50]}...' answer_idx={ans_idx}")
+            
+            # 构建消息
+            messages = []
+            if config and config.system_prompt:
+                messages.append({"role": "system", "content": config.system_prompt})
+            
+            # 添加对话历史
+            messages.extend(conversation_history)
+            
+            # 添加当前句子
+            messages.append({"role": "user", "content": sentence})
+            
+            # 调用 LLM
+            typed_messages = _convert_messages(messages)
+            llm_config = LlmConfig(
+                model=config.llm_model or "qwen-turbo" if config else "qwen-turbo",
+                temperature=config.temperature or 0.7 if config else 0.7,
+                max_tokens=config.max_tokens or 2048 if config else 2048,
+            )
+            
+            llm_service = QwenLlmService()
+            full_response = ""
+            token_index = 0
+            
+            async for chunk in llm_service.chat_stream(typed_messages, llm_config):
+                if chunk.delta:
+                    full_response += chunk.delta
+                    yield multimodal_pb2.MultiModalStreamResponse(
+                        llm=multimodal_pb2.StreamLlmFrame(
+                            delta=chunk.delta,
+                            index=token_index
+                        )
+                    )
+                    token_index += 1
+            
+            # 更新对话历史
+            conversation_history.append({"role": "user", "content": sentence})
+            conversation_history.append({"role": "assistant", "content": full_response})
+            
+            # 发送本轮回答完成事件
+            yield multimodal_pb2.MultiModalStreamResponse(
+                complete=multimodal_pb2.StreamCompleteFrame(
+                    finish_reason="sentence_complete",
+                    metadata=multimodal_pb2.ProcessingMetadata(
+                        transcribed_text=sentence,
+                        latency_ms=int((time.time() - start_time) * 1000)
+                    )
                 )
-            ))
+            )
+            
+            logger.info(f"Answer generated | session_id={session_id} answer_idx={ans_idx} response_len={len(full_response)}")
         
         try:
             async for request in request_iterator:
@@ -447,7 +495,7 @@ class OmniAgentServicer:
                     config = start_frame.config
                     initial_inputs = list(start_frame.initial_inputs)
                     
-                    logger.info(f"ProcessStream started | session_id={session_id}")
+                    logger.info(f"ProcessStream started (auto-trigger mode) | session_id={session_id}")
                     
                     # 创建 STT 服务
                     stt_service = AliyunSttService()
@@ -463,17 +511,61 @@ class OmniAgentServicer:
                         enable_punctuation=True,
                     )
                     await stt_service.start_session(session_id, stt_config)
+                    
+                    # 发送就绪事件
+                    yield multimodal_pb2.MultiModalStreamResponse(
+                        ready=multimodal_pb2.StreamReadyFrame(
+                            session_id=session_id,
+                            message="Ready for audio (auto-trigger mode)"
+                        )
+                    )
                 
                 # 处理音频帧
                 elif request.HasField('audio'):
                     if stt_service:
                         await stt_service.send_audio(request.audio.data)
                     
-                    # 发送待处理的结果
+                    # 处理 STT 结果队列
                     while not result_queue.empty():
                         try:
-                            response = result_queue.get_nowait()
-                            yield response
+                            event = result_queue.get_nowait()
+                            event_type, text, confidence = event
+                            
+                            if event_type == "stt_partial":
+                                yield multimodal_pb2.MultiModalStreamResponse(
+                                    stt=multimodal_pb2.StreamSttFrame(
+                                        text=text,
+                                        is_final=False,
+                                        confidence=confidence or 0.0
+                                    )
+                                )
+                            elif event_type == "stt_final":
+                                yield multimodal_pb2.MultiModalStreamResponse(
+                                    stt=multimodal_pb2.StreamSttFrame(
+                                        text=text,
+                                        is_final=True,
+                                        confidence=confidence or 0.0
+                                    )
+                                )
+                            elif event_type == "error":
+                                yield multimodal_pb2.MultiModalStreamResponse(
+                                    error=multimodal_pb2.StreamErrorFrame(
+                                        code=5000,
+                                        message=text,
+                                        recoverable=False
+                                    )
+                                )
+                        except asyncio.QueueEmpty:
+                            break
+                    
+                    # 检查是否有新的句子需要生成回答（自动触发模式）
+                    while not pending_sentences.empty():
+                        try:
+                            sentence = pending_sentences.get_nowait()
+                            # 为这个句子生成回答
+                            async for response in generate_answer(sentence, answer_index):
+                                yield response
+                            answer_index += 1
                         except asyncio.QueueEmpty:
                             break
                 
@@ -482,89 +574,51 @@ class OmniAgentServicer:
                     cmd = request.control.command
                     
                     if cmd == multimodal_pb2.StreamControlFrame.FLUSH:
-                        # 刷新 STT
                         if stt_service:
                             await stt_service.flush()
                     
                     elif cmd == multimodal_pb2.StreamControlFrame.END_AUDIO:
-                        # 音频结束，开始生成回复
+                        # 音频结束
                         audio_ended = True
                         
                         if stt_service:
                             await stt_service.stop_session()
                             stt_service = None
                         
-                        # 等待所有 STT 结果
-                        await asyncio.sleep(0.1)
+                        # 等待最后的 STT 结果
+                        await asyncio.sleep(0.05)
+                        
+                        # 处理剩余的 STT 结果
                         while not result_queue.empty():
                             try:
-                                response = result_queue.get_nowait()
-                                yield response
+                                event = result_queue.get_nowait()
+                                event_type, text, confidence = event
+                                if event_type in ("stt_partial", "stt_final"):
+                                    yield multimodal_pb2.MultiModalStreamResponse(
+                                        stt=multimodal_pb2.StreamSttFrame(
+                                            text=text,
+                                            is_final=(event_type == "stt_final"),
+                                            confidence=confidence or 0.0
+                                        )
+                                    )
                             except asyncio.QueueEmpty:
                                 break
                         
-                        # 合并所有识别结果
-                        transcribed_text = " ".join(stt_results)
+                        # 处理剩余的待回答句子
+                        while not pending_sentences.empty():
+                            try:
+                                sentence = pending_sentences.get_nowait()
+                                async for response in generate_answer(sentence, answer_index):
+                                    yield response
+                                answer_index += 1
+                            except asyncio.QueueEmpty:
+                                break
                         
-                        # 构建消息
-                        messages = []
-                        if config and config.system_prompt:
-                            messages.append({"role": "system", "content": config.system_prompt})
-                        
-                        # 添加初始文本输入
-                        for inp in initial_inputs:
-                            if inp.HasField('text'):
-                                messages.append({
-                                    "role": inp.text.role or "user",
-                                    "content": inp.text.content
-                                })
-                        
-                        # 添加转写文本
-                        if transcribed_text:
-                            messages.append({"role": "user", "content": transcribed_text})
-                        
-                        if not messages or all(m["role"] == "system" for m in messages):
-                            yield multimodal_pb2.MultiModalStreamResponse(
-                                complete=multimodal_pb2.StreamCompleteFrame(
-                                    finish_reason="no_input",
-                                    metadata=multimodal_pb2.ProcessingMetadata(
-                                        transcribed_text=transcribed_text,
-                                        latency_ms=int((time.time() - start_time) * 1000)
-                                    )
-                                )
-                            )
-                            break
-                        
-                        # 调用 LLM 流式生成
-                        typed_messages = _convert_messages(messages)
-                        
-                        llm_config = LlmConfig(
-                            model=config.llm_model or "qwen-turbo" if config else "qwen-turbo",
-                            temperature=config.temperature or 0.7 if config else 0.7,
-                            max_tokens=config.max_tokens or 2048 if config else 2048,
-                        )
-                        
-                        llm_service = QwenLlmService()
-                        index = 0
-                        
-                        async for chunk in llm_service.chat_stream(typed_messages, llm_config):
-                            if chunk.delta:
-                                yield multimodal_pb2.MultiModalStreamResponse(
-                                    llm=multimodal_pb2.StreamLlmFrame(
-                                        delta=chunk.delta,
-                                        index=index
-                                    )
-                                )
-                                index += 1
-                        
-                        # 发送完成帧
+                        # 发送最终完成事件
                         yield multimodal_pb2.MultiModalStreamResponse(
                             complete=multimodal_pb2.StreamCompleteFrame(
                                 finish_reason="stop",
                                 metadata=multimodal_pb2.ProcessingMetadata(
-                                    prompt_tokens=0,  # TODO: 从 LLM 响应中获取实际值
-                                    completion_tokens=0,  # TODO: 从 LLM 响应中获取实际值
-                                    transcribed_text=transcribed_text,
                                     latency_ms=int((time.time() - start_time) * 1000)
                                 )
                             )
@@ -591,7 +645,7 @@ class OmniAgentServicer:
                     await stt_service.stop_session()
                 except Exception:
                     pass
-            logger.info(f"ProcessStream closed | session_id={session_id}")
+            logger.info(f"ProcessStream closed | session_id={session_id} total_answers={answer_index}")
     
     async def HealthCheck(self, request, context):
         """健康检查"""
