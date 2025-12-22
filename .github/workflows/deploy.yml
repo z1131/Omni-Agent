@@ -86,11 +86,6 @@ jobs:
           script: |
             set -euo pipefail
 
-            if [ ! -f /root/omni-agent/.env ]; then
-              echo "ERROR: /root/omni-agent/.env not found on server" >&2
-              exit 1
-            fi
-
             echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
 
             docker compose -f /root/omni-agent/docker-compose.prod.yml pull
@@ -136,11 +131,6 @@ jobs:
           envs: ACR_REGISTRY,ACR_USERNAME,ACR_PASSWORD
           script: |
             set -euo pipefail
-
-            if [ ! -f /root/omni-agent/.env ]; then
-              echo "ERROR: /root/omni-agent/.env not found on server" >&2
-              exit 1
-            fi
 
             echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
 
