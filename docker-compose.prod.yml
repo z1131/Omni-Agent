@@ -16,13 +16,11 @@ services:
       GRPC_PORT: "50051"
       LOG_LEVEL: "INFO"
       LOG_FORMAT: "json"
-      
       # Nacos 配置 (内网)
       NACOS_ENABLED: "true"
       NACOS_SERVER_ADDR: "172.17.150.78:8848"
       NACOS_NAMESPACE: "public"
       NACOS_USERNAME: "nacos"
-      NACOS_PASSWORD: ${NACOS_PASSWORD}
       NACOS_SERVICE_NAME: "omni-agent"
       NACOS_GROUP: "DEEPKNOW_GROUP"
       SERVICE_IP: "172.17.150.78"
