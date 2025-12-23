@@ -3,6 +3,8 @@ services:
     image: crpi-16uyo5eg9cykcl2r.cn-hangzhou.personal.cr.aliyuncs.com/omni_agent/omni-agent:latest
     container_name: omni-agent
     restart: unless-stopped
+    env_file:
+      - /etc/deepknow.env
     ports:
       - "8000:8000"
       - "50051:50051"
