@@ -16,14 +16,10 @@ services:
       GRPC_PORT: "50051"
       LOG_LEVEL: "INFO"
       LOG_FORMAT: "json"
-      # Nacos 配置 (内网)
+      # Nacos 配置从 /etc/deepknow.env 加载
       NACOS_ENABLED: "true"
-      NACOS_SERVER_ADDR: "172.17.150.78:8848"
-      NACOS_NAMESPACE: "public"
-      NACOS_USERNAME: "nacos"
       NACOS_SERVICE_NAME: "omni-agent"
-      NACOS_GROUP: "DEEPKNOW_GROUP"
-      SERVICE_IP: "172.17.150.78"
+      SERVICE_IP: ${SERVICE_IP:-172.17.150.78}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
