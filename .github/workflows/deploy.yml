@@ -2,137 +2,66 @@ name: Build And Deploy Omni-Agent
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   workflow_dispatch:
 
-concurrency:
-  group: omni-agent-prod
-  cancel-in-progress: false
-
 env:
-  IMAGE: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/${{ secrets.ACR_REPOSITORY }}
+  REGISTRY: ${{ secrets.ACR_REGISTRY }}
+  IMAGE: ${{ secrets.ACR_NAMESPACE }}/${{ secrets.ACR_REPOSITORY }}
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Alibaba Cloud ACR
+      - uses: actions/checkout@v4
+      - name: Login to ACR
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_REGISTRY }}
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
-
-      - name: Build and push
+      - name: Build and Push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
 
-  deploy_ecs_1:
+  deploy:
     needs: build_and_push
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        include:
+          - host_key: ECS_1_HOST
+            user_key: ECS_1_USER
+            ssh_key: ECS_1_SSH_PRIVATE_KEY
+          - host_key: ECS_2_HOST
+            user_key: ECS_2_USER
+            ssh_key: ECS_2_SSH_PRIVATE_KEY
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Prepare deploy dir (ECS 1)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.ECS_1_HOST }}
-          username: ${{ secrets.ECS_1_USER }}
-          key: ${{ secrets.ECS_1_SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            mkdir -p /root/omni-agent
-
-      - name: Upload docker-compose.prod.yml (ECS 1)
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.ECS_1_HOST }}
-          username: ${{ secrets.ECS_1_USER }}
-          key: ${{ secrets.ECS_1_SSH_PRIVATE_KEY }}
-          source: docker-compose.prod.yml
-          target: /root/omni-agent
-
-      - name: Pull and restart (ECS 1)
+      - name: Deploy to ${{ matrix.host_key }}
         uses: appleboy/ssh-action@v1.0.3
         env:
-          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE }}
         with:
-          host: ${{ secrets.ECS_1_HOST }}
-          username: ${{ secrets.ECS_1_USER }}
-          key: ${{ secrets.ECS_1_SSH_PRIVATE_KEY }}
-          envs: ACR_REGISTRY,ACR_USERNAME,ACR_PASSWORD
+          host: ${{ secrets[matrix.host_key] }}
+          username: ${{ secrets[matrix.user_key] }}
+          key: ${{ secrets[matrix.ssh_key] }}
+          envs: ACR_PASSWORD,ACR_USERNAME,REGISTRY,IMAGE
           script: |
             set -euo pipefail
-
-            echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
-
-            docker compose -f /root/omni-agent/docker-compose.prod.yml pull
-            docker compose -f /root/omni-agent/docker-compose.prod.yml up -d
-
-  deploy_ecs_2:
-    needs: deploy_ecs_1
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Prepare deploy dir (ECS 2)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.ECS_2_HOST }}
-          username: ${{ secrets.ECS_2_USER }}
-          key: ${{ secrets.ECS_2_SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            mkdir -p /root/omni-agent
-
-      - name: Upload docker-compose.prod.yml (ECS 2)
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.ECS_2_HOST }}
-          username: ${{ secrets.ECS_2_USER }}
-          key: ${{ secrets.ECS_2_SSH_PRIVATE_KEY }}
-          source: docker-compose.prod.yml
-          target: /root/omni-agent
-
-      - name: Pull and restart (ECS 2)
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-        with:
-          host: ${{ secrets.ECS_2_HOST }}
-          username: ${{ secrets.ECS_2_USER }}
-          key: ${{ secrets.ECS_2_SSH_PRIVATE_KEY }}
-          envs: ACR_REGISTRY,ACR_USERNAME,ACR_PASSWORD
-          script: |
-            set -euo pipefail
-
-            echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
-
-            docker compose -f /root/omni-agent/docker-compose.prod.yml pull
-            docker compose -f /root/omni-agent/docker-compose.prod.yml up -d
+            echo "$ACR_PASSWORD" | docker login "$REGISTRY" -u "$ACR_USERNAME" --password-stdin
+            docker pull $REGISTRY/$IMAGE:latest
+            PRIVATE_IP=$(hostname -I | awk '{print $1}')
+            docker stop omni-agent || true
+            docker rm omni-agent || true
+            docker run -d --name omni-agent \
+              --restart unless-stopped \
+              --env-file /etc/deepknow.env \
+              -p 8000:8000 -p 50051:50051 \
+              -e SERVICE_IP="$PRIVATE_IP" \
+              $REGISTRY/$IMAGE:latest
