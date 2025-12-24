@@ -40,28 +40,31 @@ jobs:
             user_key: ECS_2_USER
             ssh_key: ECS_2_SSH_PRIVATE_KEY
     steps:
+      - uses: actions/checkout@v4
+      - name: Upload docker-compose.prod.yml
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets[matrix.host_key] }}
+          username: ${{ secrets[matrix.user_key] }}
+          key: ${{ secrets[matrix.ssh_key] }}
+          source: docker-compose.prod.yml
+          target: /root/omni-agent
+
       - name: Deploy to ${{ matrix.host_key }}
         uses: appleboy/ssh-action@v1.0.3
         env:
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           REGISTRY: ${{ env.REGISTRY }}
-          IMAGE: ${{ env.IMAGE }}
         with:
           host: ${{ secrets[matrix.host_key] }}
           username: ${{ secrets[matrix.user_key] }}
           key: ${{ secrets[matrix.ssh_key] }}
-          envs: ACR_PASSWORD,ACR_USERNAME,REGISTRY,IMAGE
+          envs: ACR_PASSWORD,ACR_USERNAME,REGISTRY
           script: |
             set -euo pipefail
             echo "$ACR_PASSWORD" | docker login "$REGISTRY" -u "$ACR_USERNAME" --password-stdin
-            docker pull $REGISTRY/$IMAGE:latest
-            PRIVATE_IP=$(hostname -I | awk '{print $1}')
-            docker stop omni-agent || true
-            docker rm omni-agent || true
-            docker run -d --name omni-agent \
-              --restart unless-stopped \
-              --env-file /etc/deepknow.env \
-              -p 8000:8000 -p 50051:50051 \
-              -e SERVICE_IP="$PRIVATE_IP" \
-              $REGISTRY/$IMAGE:latest
+            cd /root/omni-agent
+            docker compose -f docker-compose.prod.yml pull
+            export SERVICE_IP=$(hostname -I | awk '{print $1}')
+            docker compose --env-file /etc/deepknow.env -f docker-compose.prod.yml up -d
